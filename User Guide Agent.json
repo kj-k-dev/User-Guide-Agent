@@ -1,0 +1,501 @@
+{
+  "name": "User Guide Agent",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        448
+      ],
+      "id": "2cce0493-7e90-44d7-a67d-147cd2c8d940",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "fileSelector": "H:\\AI Agent\\User Guide Bot\\docs\\**\\*.pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        1296,
+        448
+      ],
+      "id": "d9f4569c-3a9f-41d3-a943-d8b4d13c20c4",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        144,
+        288
+      ],
+      "id": "a163aa0d-95a0-43e1-8391-7f7fb49d2d95",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "formTitle": "User Guide",
+        "formDescription": "Upload User Guide",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Upload",
+              "fieldType": "file",
+              "fieldName": "files",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -192,
+        288
+      ],
+      "id": "34843d9f-de42-4fd3-9d35-b25f7983b8e7",
+      "name": "On form submission",
+      "webhookId": "0b60ec1b-4a92-4db2-b27d-202fbc65dacb"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst files = item.json.files;\nconst results = [];\n\nfor (let i = 0; i < files.length; i++) {\n  results.push({\n    json: {\n      filename: files[i].filename,\n      mimetype: files[i].mimetype,\n      size: files[i].size\n    },\n    binary: {\n      data: item.binary[`files_${i}`]\n    }\n  });\n}\n\nreturn results;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        288
+      ],
+      "id": "584ba4d3-4f85-4c39-95f9-7e9c54d575d9",
+      "name": "Split Files"
+    },
+    {
+      "parameters": {
+        "modelName": "sentence-transformers/all-MiniLM-L6-v2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        320,
+        480
+      ],
+      "id": "ffd71289-cfae-4db3-9019-ca8e99d69ac0",
+      "name": "Embeddings HuggingFace Inference",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "DKXeZBEqiWDgxHYN",
+          "name": "Hugging Face account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "jsonData",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        496,
+        480
+      ],
+      "id": "073841b7-e8f0-4f80-90d8-e0a3084447df",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "chromaCollection": {
+          "__rl": true,
+          "value": "user_guide_collection",
+          "mode": "list",
+          "cachedResultName": "user_guide_collection"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreChromaDB",
+      "typeVersion": 1.3,
+      "position": [
+        352,
+        288
+      ],
+      "id": "29444f2e-48c1-4540-bc90-274bce4a2a3e",
+      "name": "Chroma Vector Store",
+      "credentials": {
+        "chromaSelfHostedApi": {
+          "id": "GylDYj8S0gxG9pXX",
+          "name": "ChromaDB Self-Hosted account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are an AI assistant connected to a vector store retrieval tool. Your primary task is to answer the user's question using the available tools to access relevant data.\n\nInstructions:\n\n* Always use the vector store tool to retrieve relevant context before answering.\n* Base your answer strictly on the retrieved information.\n* If multiple documents are returned, synthesize them into a single coherent response.\n* Do not rely on prior knowledge when tool results are available.\n* If the tool returns no relevant data, clearly state that the information is not found in the knowledge base.\n* Do not hallucinate or fabricate details.\n\nResponse Style:\n\n* Be concise but complete.\n* Provide direct answers with key details.\n* Use bullet points when helpful.\n* Avoid unnecessary explanations or filler text.\n* Include only information relevant to the user's question.\n\nWorkflow:\n\n1. Receive user question\n2. Query vector store using the tool\n3. Analyze retrieved context\n4. Generate concise, detailed answer grounded in the data\n5. If needed, ask a clarification question only when retrieval is ambiguous\n\nOutput:\nReturn only the final answer to the user, based on retrieved data.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -16,
+        720
+      ],
+      "id": "f07714a3-48f6-423e-aaa7-a20e4c385375",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gemma-4-31b-it",
+          "mode": "list",
+          "cachedResultName": "gemma-4-31b-it"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -160,
+        944
+      ],
+      "id": "dfaf85e6-df5f-4585-bfdc-997c313834d1",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "mN7QObaWbhiR1IFI",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "use this tool to answer the user's question based on the data from the user guide document which have been vectorized in chroma DB"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        192,
+        944
+      ],
+      "id": "2551d02a-72e6-436d-a20d-3c51b7fb8105",
+      "name": "Answer questions with a vector store"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gemma-4-31b-it",
+          "mode": "list",
+          "cachedResultName": "gemma-4-31b-it"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        1088
+      ],
+      "id": "00737fd4-839f-4538-ab8f-48f2acb6c5c9",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "mN7QObaWbhiR1IFI",
+          "name": "OpenAI account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chromaCollection": {
+          "__rl": true,
+          "value": "user_guide_collection",
+          "mode": "list",
+          "cachedResultName": "user_guide_collection"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreChromaDB",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        1088
+      ],
+      "id": "391501f4-f193-4eda-8c4c-9b009133fb65",
+      "name": "Chroma Vector Store1",
+      "credentials": {
+        "chromaSelfHostedApi": {
+          "id": "GylDYj8S0gxG9pXX",
+          "name": "ChromaDB Self-Hosted account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "sentence-transformers/all-MiniLM-L6-v2",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsHuggingFaceInference",
+      "typeVersion": 1,
+      "position": [
+        64,
+        1248
+      ],
+      "id": "779d4d44-99d3-45f7-a90e-7ad1941e21a0",
+      "name": "Embeddings HuggingFace Inference1",
+      "credentials": {
+        "huggingFaceApi": {
+          "id": "DKXeZBEqiWDgxHYN",
+          "name": "Hugging Face account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        944
+      ],
+      "id": "afb40db5-3ca7-4cb5-8373-f58c590b79c8",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -192,
+        720
+      ],
+      "id": "b688d10f-ff9e-4f3c-b175-394727c3d0ae",
+      "name": "When chat message received",
+      "webhookId": "0849c933-8c88-41ce-bf35-371d33b18656"
+    },
+    {
+      "parameters": {
+        "content": "## Temp",
+        "height": 672,
+        "width": 640
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        976,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "5327dd5c-6274-41b5-8b7b-6fa403bec119",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Upload User Guide Pipeline"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -544,
+        288
+      ],
+      "typeVersion": 1,
+      "id": "206e4515-9683-4974-9dce-8c22294e271a",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Chat Querying Pipeline"
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -544,
+        720
+      ],
+      "typeVersion": 1,
+      "id": "c2ddaca1-f5aa-4081-b159-2b76af565bd6",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Chroma Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Split Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Files": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Chroma Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Chroma Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chroma Vector Store1": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings HuggingFace Inference1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Chroma Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "bb5d6a82-fea4-4a28-bfeb-57cf069eeb7c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5db18d9cf7226c72dddd2802a48de5e5809ffb5f7f8ac64779168144c6d4a153"
+  },
+  "id": "XiXDWNSIm4ZOsSZW",
+  "tags": [
+    {
+      "updatedAt": "2026-04-14T07:04:26.335Z",
+      "createdAt": "2026-04-14T07:04:26.335Z",
+      "id": "2u7KqN1jdm8KJOXb",
+      "name": "Alpha"
+    }
+  ]
+}
